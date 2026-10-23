@@ -26,17 +26,33 @@
     "plugins": [
       "expo-router",
       [
-        "expo-splash-screen",
+        "expo-camera",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "cameraPermission": "Usamos tu cámara para escanear el QR del aula.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
-      ]
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Usamos tu ubicación para marcar dónde está el problema."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Usamos tus fotos para adjuntar la imagen del desperfecto."
+        }
+      ],
+      "expo-notifications"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": true
     }
+  },
+  "experiments": {
+    "typedRoutes": true,
+    "reactCompiler": true
   }
 }
