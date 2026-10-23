@@ -32,7 +32,7 @@ export default function AdjuntarFoto() {
       <Button
         title={imagen ? "Guardar y volver" : "Volver sin foto"}
         color={imagen ? "#28a745" : "gray"}
-        onPress={() => router.back()}
+        onPress={() => router.push("/reporte/nuevo")}
       />
     </View>
   );

@@ -8,10 +8,13 @@ import {
 import { CameraView } from "expo-camera";
 import { router } from "expo-router";
 import { usePermiso } from "../../hooks/usePermiso";
+import { useState } from "react";
 
 export default function Escanear() {
   // Ahora cumple exactamente con la firma requerida: usePermiso('camara')
   const { estado, pedir, abrirAjustes } = usePermiso("camara");
+
+  const [escaneado, setEscaneado] = useState(false);
 
   if (estado === "cargando") {
     return (
@@ -34,7 +37,7 @@ export default function Escanear() {
         <Button
           title="Escribir a mano (Cancelar)"
           color="gray"
-          onPress={() => router.back()}
+          onPress={() => router.push("/reporte/nuevo")}
         />
       </View>
     );
@@ -52,7 +55,7 @@ export default function Escanear() {
         <Button
           title="Escribir a mano (Cancelar)"
           color="gray"
-          onPress={() => router.back()}
+          onPress={() => router.push("/reporte/nuevo")}
         />
       </View>
     );
@@ -63,16 +66,22 @@ export default function Escanear() {
       <CameraView
         style={styles.camara}
         facing="back"
-        onBarcodeScanned={({ data }) => {
-          alert(`Aula detectada: ${data}`);
-          router.back();
-        }}
+        //  Si ya escaneó, apagamos la lectura (undefined), sino, leemos los datos
+        onBarcodeScanned={
+          escaneado
+            ? undefined
+            : ({ data }) => {
+                setEscaneado(true); // Bajamos el interruptor
+                alert(`Aula detectada: ${data}`);
+                router.push("/reporte/nuevo");
+              }
+        }
       />
       <View style={styles.botonFlotante}>
         <Button
           title="Volver al formulario"
           color="red"
-          onPress={() => router.back()}
+          onPress={() => router.push("/reporte/nuevo")}
         />
       </View>
     </View>

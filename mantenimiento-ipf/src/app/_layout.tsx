@@ -7,15 +7,14 @@ export default function Layout() {
       <Tabs.Screen name="avisos" options={{ title: "Avisos" }} />
       <Tabs.Screen name="permisos" options={{ title: "Permisos" }} />
 
-      {/* Ocultamos las rutas internas de la barra de pestañas */}
-      <Tabs.Screen
-        name="reporte"
-        options={{ href: null, headerShown: false }}
-      />
-      <Tabs.Screen
-        name="ajustes-app"
-        options={{ href: null, title: "Ajustes" }}
-      />
+      {/* Ocultamos las rutas secundarias para que no aparezcan como pestañas */}
+      <Tabs.Screen name="ajustes-app" options={{ href: null }} />
+      <Tabs.Screen name="reporte/nuevo" options={{ href: null }} />
+      <Tabs.Screen name="reporte/escanear" options={{ href: null }} />
+      <Tabs.Screen name="reporte/foto" options={{ href: null }} />
+      <Tabs.Screen name="reporte/ubicacion" options={{ href: null }} />
+      <Tabs.Screen name="reporte/[id]" options={{ href: null }} />
+      <Tabs.Screen name="permisos/[recurso]" options={{ href: null }} />
     </Tabs>
   );
 }
