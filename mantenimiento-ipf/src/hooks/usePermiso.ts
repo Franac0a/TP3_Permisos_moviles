@@ -1,66 +1,68 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { AppState, Linking, Platform } from "react-native";
+import { AppState, Linking } from "react-native";
+import { useCameraPermissions } from "expo-camera";
+import { useForegroundPermissions } from "expo-location";
 
 type EstadoPermiso = "cargando" | "concedido" | "preguntable" | "bloqueado";
 
-interface PropsHook {
-  consultar: () => Promise<any>;
-  solicitar: () => Promise<any>;
-}
+// El TP exige explícitamente que el hook reciba el recurso como parámetro
+export function usePermiso(recurso: "camara" | "ubicacion") {
+  // Obtenemos los tres elementos que devuelve Expo: [estado, funciónParaPedir, funciónParaConsultar]
+  const [permisoCamara, pedirCamara, consultarCamara] = useCameraPermissions();
+  const [permisoUbic, pedirUbic, consultarUbic] = useForegroundPermissions();
 
-export function usePermiso({ consultar, solicitar }: PropsHook) {
+  const solicitar = recurso === "camara" ? pedirCamara : pedirUbic;
+  const consultar = recurso === "camara" ? consultarCamara : consultarUbic;
+
   const [estado, setEstado] = useState<EstadoPermiso>("cargando");
   const [parcial, setParcial] = useState(false);
   const appStateAnterior = useRef(AppState.currentState);
 
-  const revisarPermiso = useCallback(async () => {
-    try {
-      const respuesta = await consultar();
+  const evaluarEstado = useCallback(async () => {
+    if (!consultar) return;
+    const res = await consultar();
+    if (!res) return;
 
-      // Detectar permisos parciales (ubicación aproximada en Android/iOS o fotos limitadas en iOS)
-      const esParcial =
-        respuesta.accessPrivileges === "limited" ||
-        respuesta.ios?.accuracy === "coarse" ||
-        respuesta.android?.accuracy === "coarse";
+    // Le decimos a TypeScript que trate a 'res' como 'any' para evitar el error de propiedades
+    const respuestaFlexible = res as any;
 
-      setParcial(esParcial);
+    // Detectar permisos parciales requeridos por el TP
+    const esParcial =
+      respuestaFlexible.accessPrivileges === "limited" ||
+      respuestaFlexible.ios?.accuracy === "coarse" ||
+      respuestaFlexible.android?.accuracy === "coarse";
 
-      if (respuesta.granted) {
-        setEstado("concedido");
-      } else if (respuesta.canAskAgain) {
-        setEstado("preguntable");
-      } else {
-        setEstado("bloqueado");
-      }
-    } catch (error) {
-      console.error("Error al consultar permiso:", error);
+    setParcial(esParcial);
+
+    if (res.granted) {
+      setEstado("concedido");
+    } else if (res.canAskAgain) {
+      setEstado("preguntable");
+    } else {
       setEstado("bloqueado");
     }
   }, [consultar]);
-
   useEffect(() => {
-    // Revisar apenas carga la pantalla
-    revisarPermiso();
+    evaluarEstado();
 
-    // Suscribirse a los cambios de estado de la app (para detectar cuando vuelve de Ajustes)
+    // Requisito del TP: actualizarse automáticamente al volver de Ajustes
     const subscripcion = AppState.addEventListener("change", (estadoActual) => {
       const estabaEnSegundoPlano =
         appStateAnterior.current.match(/inactive|background/);
       if (estabaEnSegundoPlano && estadoActual === "active") {
-        revisarPermiso();
+        evaluarEstado();
       }
       appStateAnterior.current = estadoActual;
     });
 
-    return () => {
-      subscripcion.remove();
-    };
-  }, [revisarPermiso]);
+    return () => subscripcion.remove();
+  }, [evaluarEstado]);
 
   const pedir = async () => {
-    const respuesta = await solicitar();
-    revisarPermiso(); // Actualizar el estado interno luego de pedir
-    return respuesta;
+    if (solicitar) {
+      await solicitar();
+      evaluarEstado();
+    }
   };
 
   const abrirAjustes = () => {
