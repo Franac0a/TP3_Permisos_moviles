@@ -1,73 +1,79 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { AppState, Linking } from "react-native";
+import { useCallback, useState } from "react";
 import { useCameraPermissions } from "expo-camera";
 import { useForegroundPermissions } from "expo-location";
+import * as Notifications from "expo-notifications";
+import type { PermissionResponse } from "expo-location";
+import { useFocusEffect } from "expo-router";
+import {
+  abrirAjustes as abrirAjustesSistema,
+  interpretar,
+  pedirNotificaciones,
+  type EstadoPermiso,
+  type Lectura,
+  type Recurso,
+} from "@/lib/permisos";
+import { useRevisarAlVolver } from "./useRevisarAlVolver";
 
-type EstadoPermiso = "cargando" | "concedido" | "preguntable" | "bloqueado";
+export type ResultadoPermiso = {
+  estado: EstadoPermiso;
+  /** Fotos limitadas, ubicación aproximada o notificaciones provisionales. */
+  parcial: boolean;
+  matiz: string | null;
+  respuesta: PermissionResponse | null;
+  /** Muestra el diálogo del sistema (si se puede) y devuelve el nuevo estado. */
+  pedir: () => Promise<Lectura>;
+  abrirAjustes: () => void;
+  /** Vuelve a consultar al sistema sin mostrar diálogos. */
+  revisar: () => void;
+};
 
-// El TP exige explícitamente que el hook reciba el recurso como parámetro
-export function usePermiso(recurso: "camara" | "ubicacion") {
-  // Obtenemos los tres elementos que devuelve Expo: [estado, funciónParaPedir, funciónParaConsultar]
-  const [permisoCamara, pedirCamara, consultarCamara] = useCameraPermissions();
-  const [permisoUbic, pedirUbic, consultarUbic] = useForegroundPermissions();
+/**
+ * Hook unificado de permisos.
+ * - Cámara: useCameraPermissions (expo-camera).
+ * - Ubicación: useForegroundPermissions (expo-location), solo primer plano.
+ * - Notificaciones: get/requestPermissionsAsync (expo-notifications),
+ *   creando el canal "reportes" antes de pedir en Android.
+ * Se actualiza al volver de Ajustes (AppState) y al enfocar la pantalla.
+ */
+export function usePermiso(recurso: Recurso): ResultadoPermiso {
+  // Los hooks se llaman siempre, en el mismo orden (reglas de los hooks).
+  const [camara, pedirCamara, consultarCamara] = useCameraPermissions();
+  const [ubicacion, pedirUbicacion, consultarUbicacion] = useForegroundPermissions();
+  const [notificaciones, setNotificaciones] = useState<PermissionResponse | null>(null);
 
-  const solicitar = recurso === "camara" ? pedirCamara : pedirUbic;
-  const consultar = recurso === "camara" ? consultarCamara : consultarUbic;
+  const consultarNotificaciones = useCallback(async () => {
+    const r = await Notifications.getPermissionsAsync();
+    setNotificaciones(r);
+    return r;
+  }, []);
 
-  const [estado, setEstado] = useState<EstadoPermiso>("cargando");
-  const [parcial, setParcial] = useState(false);
-  const appStateAnterior = useRef(AppState.currentState);
+  const respuesta =
+    recurso === "camara" ? camara : recurso === "ubicacion" ? ubicacion : notificaciones;
 
-  const evaluarEstado = useCallback(async () => {
-    if (!consultar) return;
-    const res = await consultar();
-    if (!res) return;
+  const revisar = useCallback(() => {
+    if (recurso === "camara") consultarCamara();
+    else if (recurso === "ubicacion") consultarUbicacion();
+    else consultarNotificaciones();
+  }, [recurso, consultarCamara, consultarUbicacion, consultarNotificaciones]);
 
-    // Le decimos a TypeScript que trate a 'res' como 'any' para evitar el error de propiedades
-    const respuestaFlexible = res as any;
+  useRevisarAlVolver(revisar); // al volver de Ajustes
+  useFocusEffect(revisar); // al montar/enfocar la pantalla (incluye la 1.ª consulta de notificaciones)
 
-    // Detectar permisos parciales requeridos por el TP
-    const esParcial =
-      respuestaFlexible.accessPrivileges === "limited" ||
-      respuestaFlexible.ios?.accuracy === "coarse" ||
-      respuestaFlexible.android?.accuracy === "coarse";
-
-    setParcial(esParcial);
-
-    if (res.granted) {
-      setEstado("concedido");
-    } else if (res.canAskAgain) {
-      setEstado("preguntable");
-    } else {
-      setEstado("bloqueado");
+  const pedir = useCallback(async () => {
+    let r: PermissionResponse;
+    if (recurso === "camara") r = await pedirCamara();
+    else if (recurso === "ubicacion") r = await pedirUbicacion();
+    else {
+      r = await pedirNotificaciones();
+      setNotificaciones(r);
     }
-  }, [consultar]);
-  useEffect(() => {
-    evaluarEstado();
+    return interpretar(r);
+  }, [recurso, pedirCamara, pedirUbicacion]);
 
-    // Requisito del TP: actualizarse automáticamente al volver de Ajustes
-    const subscripcion = AppState.addEventListener("change", (estadoActual) => {
-      const estabaEnSegundoPlano =
-        appStateAnterior.current.match(/inactive|background/);
-      if (estabaEnSegundoPlano && estadoActual === "active") {
-        evaluarEstado();
-      }
-      appStateAnterior.current = estadoActual;
-    });
+  const abrirAjustes = useCallback(() => {
+    abrirAjustesSistema(recurso);
+  }, [recurso]);
 
-    return () => subscripcion.remove();
-  }, [evaluarEstado]);
-
-  const pedir = async () => {
-    if (solicitar) {
-      await solicitar();
-      evaluarEstado();
-    }
-  };
-
-  const abrirAjustes = () => {
-    Linking.openSettings();
-  };
-
-  return { estado, parcial, pedir, abrirAjustes };
+  const { estado, parcial, matiz } = interpretar(respuesta);
+  return { estado, parcial, matiz, respuesta, pedir, abrirAjustes, revisar };
 }
