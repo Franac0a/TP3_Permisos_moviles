@@ -1,109 +1,115 @@
-import {
-  View,
-  Text,
-  Button,
-  StyleSheet,
-  ActivityIndicator,
-} from "react-native";
+// Escáner con los cuatro estados: cargando → concedido → preguntable → bloqueado.
+// Si la cámara se deniega, se puede escribir el código del aula a mano.
+import { useRef, useState } from "react";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { CameraView } from "expo-camera";
 import { router } from "expo-router";
-import { usePermiso } from "../../hooks/usePermiso";
-import { useState } from "react";
+import { AvisoBloqueado } from "@/components/AvisoBloqueado";
+import { Boton } from "@/components/Boton";
+import { Cargando } from "@/components/Cargando";
+import { colores } from "@/components/tema";
+import { usePermiso } from "@/hooks/usePermiso";
+import { usarFuncion } from "@/lib/navegacion";
+import { INFO_RECURSO } from "@/lib/permisos";
+import { actualizarBorrador, useAppStore } from "@/lib/reportes";
 
 export default function Escanear() {
-  // Ahora cumple exactamente con la firma requerida: usePermiso('camara')
-  const { estado, pedir, abrirAjustes } = usePermiso("camara");
+  // usePermiso('camara') envuelve useCameraPermissions de expo-camera.
+  const { estado, abrirAjustes } = usePermiso("camara");
 
-  const [escaneado, setEscaneado] = useState(false);
+  // 1) Cargando: el hook todavía no tiene la respuesta del sistema (null).
+  if (estado === "cargando") return <Cargando texto="Consultando permiso de cámara…" />;
 
-  if (estado === "cargando") {
-    return (
-      <View style={styles.centro}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.texto}>Cargando cámara...</Text>
-      </View>
-    );
-  }
+  // 2) Concedido
+  if (estado === "concedido") return <Camara />;
 
-  if (estado === "preguntable") {
-    return (
-      <View style={styles.centro}>
-        <Text style={styles.texto}>
-          Usamos la cámara para leer el QR del aula.
-        </Text>
-        <View style={styles.botonera}>
-          <Button title="Continuar" onPress={pedir} />
-        </View>
-        <Button
-          title="Escribir a mano (Cancelar)"
-          color="gray"
-          onPress={() => router.push("/reporte/nuevo")}
-        />
-      </View>
-    );
-  }
-
-  if (estado === "bloqueado") {
-    return (
-      <View style={styles.centro}>
-        <Text style={styles.texto}>
-          La cámara está bloqueada. Habilitala desde los ajustes de tu teléfono.
-        </Text>
-        <View style={styles.botonera}>
-          <Button title="Abrir Ajustes" onPress={abrirAjustes} />
-        </View>
-        <Button
-          title="Escribir a mano (Cancelar)"
-          color="gray"
-          onPress={() => router.push("/reporte/nuevo")}
-        />
-      </View>
-    );
-  }
-
+  // 3) Preguntable: explicación con "Continuar" (lleva a la pantalla previa).
+  // 4) Bloqueado: aviso con "Abrir Ajustes".
   return (
-    <View style={styles.container}>
+    <View style={styles.centro}>
+      {estado === "preguntable" ? (
+        <View style={styles.caja}>
+          <Text style={styles.texto}>{INFO_RECURSO.camara.beneficio}</Text>
+          <Boton titulo="Continuar" onPress={() => usarFuncion("camara", estado)} />
+        </View>
+      ) : (
+        <AvisoBloqueado recurso="camara" onAbrirAjustes={abrirAjustes} />
+      )}
+      <CodigoManual />
+    </View>
+  );
+}
+
+function Camara() {
+  const leido = useRef(false);
+  return (
+    <View style={{ flex: 1 }}>
       <CameraView
-        style={styles.camara}
+        style={{ flex: 1 }}
         facing="back"
-        //  Si ya escaneó, apagamos la lectura (undefined), sino, leemos los datos
-        onBarcodeScanned={
-          escaneado
-            ? undefined
-            : ({ data }) => {
-                setEscaneado(true); // Bajamos el interruptor
-                alert(`Aula detectada: ${data}`);
-                router.push("/reporte/nuevo");
-              }
-        }
+        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+        onBarcodeScanned={({ data }) => {
+          if (leido.current) return; // evita leer el mismo QR varias veces
+          leido.current = true;
+          actualizarBorrador({ aula: data.trim() });
+          router.back();
+        }}
       />
-      <View style={styles.botonFlotante}>
-        <Button
-          title="Volver al formulario"
-          color="red"
-          onPress={() => router.push("/reporte/nuevo")}
-        />
+      <View style={styles.flotante}>
+        <Text style={styles.guia}>Apuntá al QR pegado en la puerta del aula</Text>
+        <Boton titulo="Escribir el código a mano" variante="secundario" onPress={() => router.back()} />
       </View>
     </View>
   );
 }
 
+function CodigoManual() {
+  const { borrador } = useAppStore();
+  const [codigo, setCodigo] = useState(borrador.aula);
+  return (
+    <View style={[styles.caja, { marginTop: 16 }]}>
+      <Text style={styles.label}>O escribí el código del aula</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Ej: A-12"
+        autoCapitalize="characters"
+        value={codigo}
+        onChangeText={setCodigo}
+      />
+      <Boton
+        titulo="Usar este código"
+        variante="exito"
+        deshabilitado={!codigo.trim()}
+        onPress={() => {
+          actualizarBorrador({ aula: codigo.trim() });
+          router.back();
+        }}
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  camara: { flex: 1 },
-  centro: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
+  centro: { flex: 1, justifyContent: "center", padding: 20, backgroundColor: colores.fondo },
+  caja: { padding: 20, backgroundColor: colores.tarjeta, borderRadius: 12 },
+  texto: { fontSize: 16, textAlign: "center", marginBottom: 12 },
+  label: { fontWeight: "700", marginBottom: 6 },
+  input: {
+    borderWidth: 1,
+    borderColor: colores.borde,
+    backgroundColor: "#fff",
+    padding: 12,
+    borderRadius: 8,
+    fontSize: 16,
   },
-  texto: { textAlign: "center", marginBottom: 20, fontSize: 16 },
-  botonera: { marginBottom: 15 },
-  botonFlotante: {
+  flotante: {
     position: "absolute",
     bottom: 30,
-    alignSelf: "center",
-    backgroundColor: "white",
-    borderRadius: 8,
+    left: 20,
+    right: 20,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    borderRadius: 12,
+    padding: 12,
   },
+  guia: { textAlign: "center", fontWeight: "600", marginBottom: 4 },
 });

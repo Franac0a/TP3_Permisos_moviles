@@ -1,54 +1,67 @@
-import { View, Text, Button, StyleSheet } from "react-native";
-import { router } from "expo-router";
+// Interruptor "Avisarme cuando se resuelva mi reporte".
+// El permiso de notificaciones se pide ÚNICAMENTE al activar este interruptor.
+import { StyleSheet, Switch, Text, View } from "react-native";
+import { Boton } from "@/components/Boton";
+import { colores } from "@/components/tema";
+import { usePermiso } from "@/hooks/usePermiso";
+import { usarFuncion } from "@/lib/navegacion";
+import { setAvisarAlResolver, useAppStore } from "@/lib/reportes";
 
 export default function AjustesApp() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.titulo}>Configuración Manual</Text>
+  const { avisarAlResolver } = useAppStore();
+  const { estado, abrirAjustes } = usePermiso("notificaciones");
 
-      <Text style={styles.texto}>
-        Tu dispositivo no permite abrir los ajustes automáticamente. Para
-        habilitar los permisos, seguí estos pasos:
+  const cambiar = (activar: boolean) => {
+    if (!activar) {
+      setAvisarAlResolver(false);
+      return;
+    }
+    // Concedido → se activa. Si no, pantalla previa; si allí se concede,
+    // la pantalla previa activa el interruptor.
+    if (usarFuncion("notificaciones", estado)) setAvisarAlResolver(true);
+  };
+
+  const activoSinPermiso = avisarAlResolver && estado !== "concedido" && estado !== "cargando";
+
+  return (
+    <View style={styles.contenedor}>
+      <View style={styles.fila}>
+        <Text style={styles.texto}>Avisarme cuando se resuelva mi reporte</Text>
+        <Switch
+          value={avisarAlResolver && estado === "concedido"}
+          onValueChange={cambiar}
+          disabled={estado === "cargando"}
+        />
+      </View>
+      <Text style={styles.nota}>
+        Aunque no actives las notificaciones, todos los avisos aparecen en la pestaña Avisos.
       </Text>
 
-      <View style={styles.pasos}>
-        <Text style={styles.paso}>
-          1. Volvé a la pantalla de inicio de tu celular.
-        </Text>
-        <Text style={styles.paso}>2. Abrí "Ajustes" o "Configuración".</Text>
-        <Text style={styles.paso}>
-          3. Entrá a "Aplicaciones" y buscá esta app.
-        </Text>
-        <Text style={styles.paso}>
-          4. Tocá en "Permisos" y habilitá los que necesites.
-        </Text>
-      </View>
-
-      <Button title="Volver atrás" onPress={() => router.back()} />
+      {(estado === "bloqueado" || activoSinPermiso) && (
+        <View style={styles.caja}>
+          <Text style={styles.cajaTexto}>
+            Las notificaciones están desactivadas en el sistema. Si querés recibirlas, habilitalas
+            desde Ajustes.
+          </Text>
+          <Boton titulo="Abrir Ajustes" variante="secundario" onPress={abrirAjustes} />
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    justifyContent: "center",
-    backgroundColor: "#fff",
+  contenedor: { flex: 1, padding: 20, backgroundColor: colores.fondo },
+  fila: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    backgroundColor: colores.tarjeta,
+    borderRadius: 12,
   },
-  titulo: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-    textAlign: "center",
-    color: "#d9534f",
-  },
-  texto: { fontSize: 16, marginBottom: 20, textAlign: "center" },
-  pasos: {
-    backgroundColor: "#f5f5f5",
-    padding: 20,
-    borderRadius: 10,
-    marginBottom: 30,
-  },
-  paso: { fontSize: 16, marginBottom: 10, fontWeight: "500" },
+  texto: { fontSize: 16, flex: 1, marginRight: 12 },
+  nota: { color: colores.suave, marginTop: 12 },
+  caja: { marginTop: 20, padding: 16, backgroundColor: colores.tarjeta, borderRadius: 12 },
+  cajaTexto: { marginBottom: 8 },
 });

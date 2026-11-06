@@ -1,82 +1,106 @@
-import {
-  View,
-  Text,
-  TextInput,
-  Button,
-  StyleSheet,
-  ScrollView,
-} from "react-native";
+// Formulario: no pide ningún permiso al abrir. Cada permiso se pide recién
+// cuando la persona toca su función, y cada función tiene una alternativa.
+import { Alert, Image, ScrollView, StyleSheet, Text, TextInput } from "react-native";
 import { router } from "expo-router";
+import { Boton } from "@/components/Boton";
+import { Chips } from "@/components/Chips";
+import { colores } from "@/components/tema";
+import { usePermiso } from "@/hooks/usePermiso";
+import { usarFuncion } from "@/lib/navegacion";
+import {
+  CATEGORIAS,
+  actualizarBorrador,
+  describirUbicacion,
+  guardarBorrador,
+  useAppStore,
+} from "@/lib/reportes";
 
 export default function NuevoReporte() {
+  const { borrador } = useAppStore();
+  const camara = usePermiso("camara");
+
+  const guardar = () => {
+    const resultado = guardarBorrador();
+    if (!resultado.ok) {
+      Alert.alert("Falta completar", resultado.error);
+      return;
+    }
+    router.replace({ pathname: "/reporte/[id]", params: { id: resultado.reporte.id } });
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.label}>Título del reporte:</Text>
-      <TextInput style={styles.input} placeholder="Ej: Luz quemada" />
-
-      <Text style={styles.label}>Descripción:</Text>
-      <TextInput
-        style={[styles.input, { height: 80 }]}
-        placeholder="Detalles del desperfecto"
-        multiline
-      />
-
-      <Text style={styles.label}>Categoría:</Text>
+    <ScrollView contentContainerStyle={styles.contenedor} keyboardShouldPersistTaps="handled">
+      <Text style={styles.label}>Título</Text>
       <TextInput
         style={styles.input}
-        placeholder="Electricidad, agua, mobiliario, equipos"
+        placeholder="Ej: Luz quemada"
+        value={borrador.titulo}
+        onChangeText={(titulo) => actualizarBorrador({ titulo })}
       />
 
-      <Text style={styles.label}>Aula:</Text>
-      <View style={styles.fila}>
-        <TextInput
-          style={[styles.input, { flex: 1, marginRight: 10, marginBottom: 0 }]}
-          placeholder="Escribir o escanear..."
-        />
-        <Button
-          title="Escanear QR"
-          onPress={() => router.push("/reporte/escanear")}
-        />
-      </View>
+      <Text style={styles.label}>Descripción</Text>
+      <TextInput
+        style={[styles.input, { height: 80, textAlignVertical: "top" }]}
+        placeholder="Detalles del desperfecto"
+        multiline
+        value={borrador.descripcion}
+        onChangeText={(descripcion) => actualizarBorrador({ descripcion })}
+      />
 
-      <View style={styles.acciones}>
-        <Button
-          title="Adjuntar Foto"
-          onPress={() => router.push("/reporte/foto")}
-        />
-        <View style={{ width: 10 }} />
-        <Button
-          title="Marcar Ubicación"
-          onPress={() => router.push("/reporte/ubicacion")}
-        />
-      </View>
+      <Text style={styles.label}>Categoría</Text>
+      <Chips
+        opciones={CATEGORIAS}
+        valor={borrador.categoria}
+        onCambiar={(categoria) => actualizarBorrador({ categoria })}
+      />
 
-      <View style={styles.guardar}>
-        <Button
-          title="Guardar Reporte"
-          color="#28a745"
-          onPress={() => router.push("/")}
-        />
-      </View>
+      <Text style={styles.label}>Aula</Text>
+      {/* Alternativa a la cámara: se puede escribir el código a mano. */}
+      <TextInput
+        style={styles.input}
+        placeholder="Escribí el código (ej: A-12) o escaneá el QR"
+        autoCapitalize="characters"
+        value={borrador.aula}
+        onChangeText={(aula) => actualizarBorrador({ aula })}
+      />
+      <Boton
+        titulo="📷 Escanear QR del aula"
+        variante="secundario"
+        onPress={() => usarFuncion("camara", camara.estado, "/reporte/escanear")}
+      />
+
+      <Text style={styles.label}>Foto</Text>
+      {borrador.fotoUri && <Image source={{ uri: borrador.fotoUri }} style={styles.foto} />}
+      <Boton
+        titulo={borrador.fotoUri ? "Cambiar foto" : "🖼️ Adjuntar foto"}
+        variante="secundario"
+        onPress={() => router.push("/reporte/foto")}
+      />
+
+      <Text style={styles.label}>Ubicación</Text>
+      <Text style={styles.valor}>{describirUbicacion(borrador.ubicacion)}</Text>
+      <Boton
+        titulo="📍 Marcar ubicación"
+        variante="secundario"
+        onPress={() => router.push("/reporte/ubicacion")}
+      />
+
+      <Boton titulo="Guardar reporte" variante="exito" onPress={guardar} estilo={{ marginTop: 24 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
-  label: { fontWeight: "bold", marginTop: 10, marginBottom: 5 },
+  contenedor: { padding: 20, backgroundColor: colores.fondo },
+  label: { fontWeight: "700", marginTop: 14, marginBottom: 6 },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
+    borderColor: colores.borde,
+    padding: 12,
     borderRadius: 8,
-    marginBottom: 10,
+    marginBottom: 4,
+    fontSize: 16,
   },
-  fila: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
-  acciones: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 30,
-  },
-  guardar: { marginTop: 20 },
+  valor: { color: colores.suave, marginBottom: 4 },
+  foto: { width: "100%", height: 180, borderRadius: 10, marginBottom: 6 },
 });

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "mantenimiento-ipf",
+    "name": "Mantenimiento IPF",
     "slug": "mantenimiento-ipf",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -21,8 +21,19 @@
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",
-        "android.permission.READ_MEDIA_IMAGES"
-      ]
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
+      ],
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "package": "com.franac0a.mantenimientoipf"
     },
     "web": {
       "output": "static",
@@ -33,7 +44,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Usamos tu cámara para escanear el QR del aula.",
+          "cameraPermission": "Usamos tu cámara para leer el QR de la puerta del aula y sacar la foto del desperfecto.",
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
@@ -41,13 +52,17 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Usamos tu ubicación para marcar dónde está el problema."
+          "locationWhenInUsePermission": "Usamos tu ubicación para marcar en el reporte dónde está el desperfecto dentro del Instituto.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Usamos tus fotos para adjuntar la imagen del desperfecto."
+          "photosPermission": false,
+          "cameraPermission": "Usamos tu cámara para leer el QR de la puerta del aula y sacar la foto del desperfecto.",
+          "microphonePermission": false
         }
       ],
       "expo-notifications"

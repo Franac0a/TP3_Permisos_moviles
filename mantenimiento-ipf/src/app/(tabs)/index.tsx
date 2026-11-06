@@ -1,59 +1,68 @@
-import { View, Text, StyleSheet, FlatList } from "react-native";
-import { Link } from "expo-router";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
+import { Boton } from "@/components/Boton";
+import { COLOR_REPORTE, colores } from "@/components/tema";
+import { useAppStore } from "@/lib/reportes";
 
-// Datos de prueba para simular los reportes cargados
-const REPORTES_PRUEBA = [
-  { id: "1", titulo: "Luz quemada en pasillo", estado: "pendiente" },
-  { id: "2", titulo: "Canilla perdiendo", estado: "en curso" },
-  { id: "3", titulo: "Proyector sin imagen", estado: "resuelto" },
-];
-
+// Inicio: no pide ningún permiso.
 export default function Inicio() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.titulo}>Mis Reportes</Text>
+  const { reportes } = useAppStore();
 
+  return (
+    <View style={styles.contenedor}>
       <FlatList
-        data={REPORTES_PRUEBA}
-        keyExtractor={(item) => item.id}
+        data={reportes}
+        keyExtractor={(r) => r.id}
+        ListEmptyComponent={<Text style={styles.vacio}>Todavía no cargaste reportes.</Text>}
         renderItem={({ item }) => (
-          <View style={styles.tarjeta}>
-            <Text style={styles.tarjetaTitulo}>{item.titulo}</Text>
-            <Text>Estado: {item.estado}</Text>
-            {/* Este Link nos lleva a la pantalla de detalle del reporte */}
-            <Link href={`/reporte/${item.id}`} style={styles.linkDetalle}>
-              Ver detalle
-            </Link>
-          </View>
+          <Pressable
+            style={styles.tarjeta}
+            onPress={() => router.push({ pathname: "/reporte/[id]", params: { id: item.id } })}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.titulo}>{item.titulo}</Text>
+              <Text style={styles.sub}>
+                {item.categoria ?? "sin categoría"}
+                {item.aula ? ` · Aula ${item.aula}` : ""}
+              </Text>
+            </View>
+            <Text style={[styles.estado, { backgroundColor: COLOR_REPORTE[item.estado] }]}>
+              {item.estado}
+            </Text>
+          </Pressable>
         )}
       />
-
-      {/* Botón para ir a crear un reporte nuevo */}
-      <Link href="/reporte/nuevo" style={styles.botonNuevo}>
-        <Text style={styles.textoBoton}>+ Nuevo reporte</Text>
-      </Link>
+      <Boton titulo="+ Nuevo reporte" onPress={() => router.push("/reporte/nuevo")} />
+      <Boton
+        titulo="🔔 Configurar avisos"
+        variante="secundario"
+        onPress={() => router.push("/ajustes-app")}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
-  titulo: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
+  contenedor: { flex: 1, padding: 16, backgroundColor: colores.fondo },
   tarjeta: {
-    padding: 15,
-    backgroundColor: "#f5f5f5",
-    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    backgroundColor: colores.tarjeta,
+    borderRadius: 10,
     marginBottom: 10,
   },
-  tarjetaTitulo: { fontSize: 18, fontWeight: "bold", marginBottom: 5 },
-  linkDetalle: { color: "#007AFF", marginTop: 10, fontWeight: "500" },
-  botonNuevo: {
-    backgroundColor: "#007AFF",
-    padding: 15,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 20,
-    textAlign: "center",
+  titulo: { fontSize: 16, fontWeight: "700" },
+  sub: { color: colores.suave, marginTop: 2, textTransform: "capitalize" },
+  estado: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    overflow: "hidden",
+    textTransform: "uppercase",
   },
-  textoBoton: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  vacio: { textAlign: "center", color: colores.suave, marginTop: 40 },
 });
